@@ -105,3 +105,77 @@ let failSubset = IsSubsetOf(secondSet, firstSet);;
 eval failSubset emptyEnv;;
 let emptySubset = IsSubsetOf(firstSet, EmptySet(IntType));;
 eval emptySubset emptyEnv;;
+
+(* METODO Union *)
+let firstSet = Insert(
+				Insert(
+					EmptySet(IntType),
+					CstInt(2)
+				),
+				CstInt(1)			
+			 );;
+let secondSet = Insert(
+					Insert(EmptySet(IntType),
+					CstInt(3)
+				),
+				CstInt(4)			
+			 );;
+let integerUnion = Union(firstSet,secondSet);;
+eval integerUnion emptyEnv;;
+let thirdSet = Insert(
+					Insert(EmptySet(IntType),
+					CstInt(3)
+				),
+				CstInt(2)			
+			 );;
+let duplicateUnion = Union(firstSet,thirdSet);;
+eval duplicateUnion emptyEnv;;
+let emptySet = EmptySet(IntType);;
+let unionEmpty = Union(firstSet,emptySet);;
+eval unionEmpty emptyEnv;;
+
+(* METODO Intersect *)
+let firstSet = Insert(
+		Insert(
+			EmptySet(IntType),
+			CstInt(2)
+		),
+		CstInt(1)			
+		);;
+let secondSet = Insert(
+			Insert(
+				EmptySet(IntType),
+				CstInt(3)
+			),
+			CstInt(4)			
+		);;
+let integerIntersect = Intersect(firstSet,secondSet);;
+eval integerIntersect emptyEnv;;
+let thirdSet = Insert(
+		Insert(
+			EmptySet(IntType),
+			CstInt(3)
+		),
+		CstInt(2)			
+		);;
+let oneElementIntersect = Intersect(firstSet,thirdSet);;
+eval oneElementIntersect emptyEnv;;
+let emptySet = EmptySet(IntType);;
+let intersectEmpty = Intersect(firstSet,emptySet);;
+eval intersectEmpty emptyEnv;;
+
+(* METODO Difference*)
+let firstSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
+let secondSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(4)),CstInt(3)), CstInt(2));;
+let integerSetsDifference = Difference(firstSet,secondSet);;
+eval integerSetsDifference emptyEnv;;
+let integerSetsDifference = Difference(secondSet,firstSet);;
+eval integerSetsDifference emptyEnv;;
+let emptySetsDifference1 = Difference(EmptySet(IntType),firstSet);;
+eval emptySetsDifference1 emptyEnv;;
+let emptySetsDifference2 = Difference(firstSet,EmptySet(IntType));;
+eval emptySetsDifference2 emptyEnv;;
+let emptySetsDifference3 = Difference(EmptySet(IntType),EmptySet(IntType));;
+eval emptySetsDifference3 emptyEnv;;
+let emptySetDifference = Difference(firstSet,firstSet);;
+eval emptySetDifference emptyEnv;;

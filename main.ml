@@ -1,18 +1,18 @@
 (* tipi di base del mio linguaggio *)
-type ide = string;;
 type types = 
 	| IntType 
 	| BoolType 
 	| StringType
 	| SetType of types
-type evT =
+(* evaluation types del mio linguaggio *)
+type ide = string;;
+type evT = 
 	| Int of int
 	| Bool of bool
 	| String of string
 	| Set of types*evT list
 	| Unbound;;
-
-(* possibili espressioni del linguaggio e loro significato *)
+(* Albero di sintassi astratta *)
 type exp = 
 	| Den of ide
 	| CstInt of int
@@ -22,15 +22,26 @@ type exp =
 	| Let of ide*exp*exp
 	| EmptySet of types
 	| Singleton of exp*types
-	| Insert of exp*exp (* set*valore *)
-	| Remove of exp*exp (* set*valore *)
+	| Insert of exp*exp (* Set*evT *)
+	| Remove of exp*exp (* Set*evT *)
 	| IsEmpty of exp
 	| SetMax of exp
 	| SetMin of exp
-	| IsIn of exp*exp (* set*valore *)
-	| IsSubsetOf of exp*exp (* setContenitore*setContenuto *);;
+	| IsIn of exp*exp (* Set*evT *)
+	| IsSubsetOf of exp*exp (* setContenitore*setContenuto *)
+	| Union of exp*exp (* set1 + set2 *)
+	| Intersect of exp*exp (* set1 and set2 *)
+	| Difference of exp*exp;; (* set1 - set2 *)
 
-(* Definizione del typechecker dinamico *)
+(* Definizione del typechecking dinamico 
+
+	typecheck è una funzione che, attraverso il pattern matching,
+	restituisce vero se il tipo del valore fornito (actualType) 
+	coincide con il tipo atteso (typeDescriptor), falso altrimenti
+	
+	getType è una funzione che, dato un valore, restuisce il tipo
+	di tale valore
+*)
 let typecheck (typeDescriptor: types) (actualType: evT): bool =
 	match (typeDescriptor,actualType) with
 	| (IntType, Int(_)) -> true
@@ -46,8 +57,12 @@ let getType (value: evT): types =
 	| String(_) -> StringType
 	| Set(typeOfSet, _) -> SetType(typeOfSet)
 	| Unbound -> failwith("Unbound value has no type");;
+(* Definizione dell'ambiente 
 
-(* Definizione dell'ambiente *)
+	L'ambiente è stato implementato sotto forma di lista,
+	dove ogni elemento contiene il binding tra l'identificatore
+	e il valore.
+*)
 type 't env = (ide * 't) list;;
 let emptyEnv : evT env = [];;
 let bind (env: evT env) (id: ide) (value: evT) = (id,value)::env;;
@@ -56,30 +71,32 @@ let rec lookup (myEnv: evT env) (x: ide) : evT=
 	| (y,v)::t -> if x = y then v else lookup t x
 	| [] -> Unbound;;
 
-(* implementazione delle funzioni legate al tipo Set *)
+(* Implementazione delle funzioni legate al tipo Set *)
 let emptyEvtList : evT list = [];; 
 let emptySet (typeOfSet: types): evT = 
 	match typeOfSet with
 	| SetType(_) -> failwith("A set cannot cointain another set")
 	| _ -> Set(typeOfSet,emptyEvtList);; 
-let singletonSet (v: evT) (setType: types): evT = (*PERMETTE DI CREARE SET DI SET*)
-	match typecheck setType v with
-	| true -> Set(setType, v::emptyEvtList)
-	| false -> failwith("Set type and value type don't match");;
+let singletonSet (v: evT) (setType: types): evT = 
+	let valueType = getType v in (* controllo il tipo del valore passato *)
+		match valueType with
+		| SetType(_) -> failwith("A set cannot cointain another set")
+		| _ -> if setType = valueType then Set(setType, v::emptyEvtList) (* creo il set solo se il tipo del valore ed il tipo specificato per il set coincidono *)
+				else failwith("Set type and value type don't match");; 
 let bool_IsEmpty (value: evT): bool = 
 	match value with
 	| Set(_,[]) -> true
 	| Set(_,head::tail) -> false
-	| _ -> failwith("Run-time error: this is not a set")
+	| _ -> failwith("This is not a set")
 let set_setInsertion (set: evT) (value: evT): evT =
-	let valueType = getType(value) in
+	let valueType = getType(value) in (* controllo il tipo del valore passato *)
 		let expectedSetType = SetType(valueType) in
-			match typecheck expectedSetType set with
+			match typecheck expectedSetType set with 
 			| true -> (
-						match set with
+						match set with 
 						| Set(typeOfSet,[]) -> Set(typeOfSet, [value])
-						| Set(typeOfSet,list) -> 
-							if List.mem value list then failwith("Elemento già esistente")
+						| Set(typeOfSet,list) -> (* se il set non è vuoto, controllo se contiene già value usando List.mem *)
+							if List.mem value list then failwith("The value is already into the set")
 							else Set(typeOfSet, value::list)
 					  )
 			| false -> failwith("Value and set type don't match");;
@@ -93,6 +110,8 @@ let set_setRemove (set: evT) (value: evT): evT =
 						| Set(typeOfSet,list) ->
 							let aux = fun x -> x <> value in
 								Set(typeOfSet, List.filter aux list)
+								(* List.filter mi restituisce la lista di elementi che sono diversi
+								   dal valore che voglio rimuovere *)
 					  )
 			| false -> failwith("Value and set type don't match");;
 let evT_findMax (v: evT) : evT =
@@ -100,6 +119,8 @@ let evT_findMax (v: evT) : evT =
 	| SetType(_) ->	match v with 
 					| Set(_, []) -> failwith("The set is empty")
 					| Set(_,head::tail) -> (
+							(* Uso una funzione ricorsiva ausiliaria per fare uno
+							   scan lineare del set e trovare il valore massimo *)
 							let rec aux list localMax = 
 								match list with
 								| [] -> localMax
@@ -113,6 +134,8 @@ let evT_findMin (v: evT) : evT =
 	| SetType(_) ->	match v with 
 					| Set(_, []) -> failwith("The set is empty")
 					| Set(_,head::tail) -> (
+							(* Come sopra, uso una funzione ausiliaria per trovare
+							   il valore minimo nel set *)
 							let rec aux list localMin = 
 								match list with
 								| [] -> localMin
@@ -128,18 +151,81 @@ let bool_isInSet (set: evT) (value: evT): bool =
 			| true -> ( match set with
 						| Set(_,[]) -> false
 						| Set(_,list) -> List.mem value list
+						(* List.mem restituisce vero se il valore
+						   è contenuto nella lista, falso altrimenti *)
 					  )
 			| false -> failwith("Value and set type don't match");;
 let bool_isSubsetOf (set1: evT) (set2: evT): bool = 
-	match (set1,set2) with
+	match (set1,set2) with (* Controllo che entrambi siano set e che siano dello stesso tipo *)
 	| (Set(type1, list1),Set(type2, list2)) -> if type1 <> type2 then failwith("Type mismatch")
 								 else (
+								 	(* La funzione ausiliaria inInList1, applicata ad un parametro, 
+								 	   restituisce vero se tale parametro è contenuto in list1, 
+								 	   falso altrimenti.
+								 	   La funzione List.for_all verifica se tutti gli elementi
+								 	   in list2 verificano la proprietà espressa da isInList1 *)
 								 	let isInList1 = fun elem -> List.mem elem list1 
 								 		in List.for_all isInList1 list2
 								 )
 	| (Set(_), _) -> failwith("Second element is not a set")
 	| (_, Set(_)) -> failwith("First element is not a set")
 	| (_,_) -> failwith("Both elements are not sets")
+let set_unionSet (set1: evT) (set2: evT): evT = 
+	match (set1,set2) with (* Controllo che entrambi siano set e che siano dello stesso tipo *)
+	| (Set(type1, list1),Set(type2, list2)) -> if type1 <> type2 then failwith("Type mismatch")
+												else(
+													(*
+														La funzione ausiliaria isNotInList1 prende un parametro 
+														e restituisce vero se il parametro non è contenuto in 
+														list1, falso altrimenti.
+														Per effettuare l'unione degli insiemi viene quindi 
+														utilizzata la funzione di base List.filter per raccogliere
+														nella lista cleanedList gli elementi di list2 che NON 
+														sono già presenti in list1; alla fine viene restituito un 
+														set contenente gli elementi di list1 e cleanedList. 
+													*)
+													let isNotInList1 = fun elem -> not (List.mem elem list1)
+														in let cleanedList2 = List.filter isNotInList1 list2 in
+															Set(type1, List.append list1 cleanedList2)
+												)
+	| (Set(_), _) -> failwith("Second element is not a set")
+	| (_, Set(_)) -> failwith("First element is not a set")
+	| (_,_) -> failwith("Both elements are not sets");;
+
+let set_intersectSet (set1: evT) (set2: evT): evT = 
+	match (set1,set2) with (* Controllo che entrambi siano set e che siano dello stesso tipo *)
+	| (Set(type1, list1),Set(type2, list2)) -> if type1 <> type2 then failwith("Type mismatch")
+												else(
+													(*
+														Utilizzando la funzione ausiliaria isInList1, viene 
+														restituito un set contenente gli elementi di list2
+														che sono presenti anche in list1
+													*)
+													let isInList1 = fun elem -> List.mem elem list1
+														in let commonElementsList = List.filter isInList1 list2 in
+															Set(type1, commonElementsList)
+												)
+	| (Set(_), _) -> failwith("Second element is not a set")
+	| (_, Set(_)) -> failwith("First element is not a set")
+	| (_,_) -> failwith("Both elements are not sets");;
+	
+let set_differenceSet (set1: evT) (set2: evT): evT = 
+	match (set1,set2) with (* Controllo che entrambi siano set e che siano dello stesso tipo *)
+	| (Set(type1, list1),Set(type2, list2)) -> if type1 <> type2 then failwith("Type mismatch")
+												else(
+													(*
+														Utilizzando la funzione ausiliaria isNotInList2, viene
+														restituito un set contenente gli elementi di list1
+														che non sono presenti in list2
+													*)
+													let isNotInList2 = fun elem -> not (List.mem elem list2)
+														in let differenceElementsList = List.filter isNotInList2 list1 in
+															Set(type1, differenceElementsList)
+												)
+	| (Set(_), _) -> failwith("Second element is not a set")
+	| (_, Set(_)) -> failwith("First element is not a set")
+	| (_,_) -> failwith("Both elements are not sets");;
+
 (* implementazione delle funzioni di base del linguaggio *)
 let int_sum (v1: evT) (v2: evT) : evT =
 	match (typecheck IntType v1, typecheck IntType v2) with
@@ -148,7 +234,7 @@ let int_sum (v1: evT) (v2: evT) : evT =
 					 | _ -> failwith("run-time error") )
 	| (_,_) -> failwith("Type error in Sum");;
 	
-(* Interprete *)
+(* Funzione di valutazione delle espressioni *)
 let rec eval (expression: exp) (myEnv: evT env): evT =
 	match expression with
 	| Den(id) -> lookup myEnv id
@@ -167,4 +253,7 @@ let rec eval (expression: exp) (myEnv: evT env): evT =
 	| SetMax(e) -> evT_findMax (eval e myEnv)
 	| SetMin(e) -> evT_findMin (eval e myEnv)
 	| IsIn(e1,e2) -> Bool(bool_isInSet (eval e1 myEnv) (eval e2 myEnv))
-	| IsSubsetOf(e1,e2) -> Bool(bool_isSubsetOf (eval e1 myEnv) (eval e2 myEnv));;
+	| IsSubsetOf(e1,e2) -> Bool(bool_isSubsetOf (eval e1 myEnv) (eval e2 myEnv))
+	| Union(e1,e2) -> set_unionSet (eval e1 myEnv) (eval e2 myEnv)
+	| Intersect(e1,e2) -> set_intersectSet (eval e1 myEnv) (eval e2 myEnv)
+	| Difference(e1,e2) -> set_differenceSet (eval e1 myEnv) (eval e2 myEnv);;
