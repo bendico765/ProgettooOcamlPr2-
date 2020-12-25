@@ -4,14 +4,8 @@ type types =
 	| BoolType 
 	| StringType
 	| SetType of types
-(* evaluation types del mio linguaggio *)
 type ide = string;;
-type evT = 
-	| Int of int
-	| Bool of bool
-	| String of string
-	| Set of types*evT list
-	| Unbound;;
+type 't env = (ide * 't) list;;
 (* Albero di sintassi astratta *)
 type exp = 
 	| Den of ide
@@ -19,6 +13,7 @@ type exp =
 	| CstBool of bool
 	| CstString of string
 	| Sum of exp*exp
+	| Equal of exp*exp
 	| Let of ide*exp*exp
 	| EmptySet of types
 	| Singleton of exp*types
@@ -31,8 +26,32 @@ type exp =
 	| IsSubsetOf of exp*exp (* setContenitore*setContenuto *)
 	| Union of exp*exp (* set1 + set2 *)
 	| Intersect of exp*exp (* set1 and set2 *)
-	| Difference of exp*exp;; (* set1 - set2 *)
-
+	| Difference of exp*exp (* set1 - set2 *)
+	| Fun of ide*exp (* Astrazione di funzione: ideFunzione,*)
+	| Apply of exp*exp (* Applicazione di funzione *)
+	| Map of ide*exp  (* function*set *);;
+	
+(* evaluation types del mio linguaggio 
+	
+	Le funzioni sono state implementate prevedendo lo 
+	scoping statico, seguendo questo schema:
+   
+   	Closure(argIde,fBody,fEnv)
+		- nome del parametro formale (argIde)
+		- corpo della funzione (fBody)
+		- ambiente al momento della dichiarazione (fEnv)
+		
+   	Apply rappresenta l'effettiva chiamata della funzione, dove
+   	il primo parametro è la denominazione della funzione chiamata, 
+   	mentre il secondo parametro è il parametro attuale
+*)
+type evT = 
+	| Int of int
+	| Bool of bool
+	| String of string
+	| Set of types*evT list
+	| Closure of ide*exp*evT env 
+	| Unbound;;
 (* Definizione del typechecking dinamico 
 
 	typecheck è una funzione che, attraverso il pattern matching,
@@ -63,7 +82,6 @@ let getType (value: evT): types =
 	dove ogni elemento contiene il binding tra l'identificatore
 	e il valore.
 *)
-type 't env = (ide * 't) list;;
 let emptyEnv : evT env = [];;
 let bind (env: evT env) (id: ide) (value: evT) = (id,value)::env;;
 let rec lookup (myEnv: evT env) (x: ide) : evT= 
@@ -233,7 +251,27 @@ let int_sum (v1: evT) (v2: evT) : evT =
 					 | (Int(x),Int(y)) -> Int(x+y)
 					 | _ -> failwith("run-time error") )
 	| (_,_) -> failwith("Type error in Sum");;
+
+let bool_equal (v1: evT) (v2: evT) : bool =
+	match (v1,v2) with
+	| (Int(x), Int(y)) 
+	| (Bool(x), Bool(y)) 
+	| (String(x), String(y)) -> x = y
+	| (Closure(_), Closure(_)) -> failwith("Functions can't be compared")
+	| (Set(_), Set(_)) -> failwith("Sets can't be compared")
+	| (_,_) -> failwith("Type mismatch")
 	
+(**)
+let getExpType (expression: exp): types =
+	match expression with
+	| Den(_) -> StringType
+	| CstInt(_) -> IntType
+	| CstBool(_) -> BoolType
+	| Sum(_,_) -> IntType
+	| _ -> IntType;;
+
+
+
 (* Funzione di valutazione delle espressioni *)
 let rec eval (expression: exp) (myEnv: evT env): evT =
 	match expression with
@@ -242,6 +280,7 @@ let rec eval (expression: exp) (myEnv: evT env): evT =
 	| CstBool(b) -> Bool(b)
 	| CstString(s) -> String(s)
 	| Sum(e1,e2) -> int_sum (eval e1 myEnv) (eval e2 myEnv)
+	| Equal(e1,e2) -> Bool(bool_equal (eval e1 myEnv) (eval e2 myEnv) )
 	| Let(id,e,eBody) -> 
 		let newEnv = bind myEnv id (eval e myEnv) in 
 			eval eBody newEnv
@@ -256,4 +295,50 @@ let rec eval (expression: exp) (myEnv: evT env): evT =
 	| IsSubsetOf(e1,e2) -> Bool(bool_isSubsetOf (eval e1 myEnv) (eval e2 myEnv))
 	| Union(e1,e2) -> set_unionSet (eval e1 myEnv) (eval e2 myEnv)
 	| Intersect(e1,e2) -> set_intersectSet (eval e1 myEnv) (eval e2 myEnv)
-	| Difference(e1,e2) -> set_differenceSet (eval e1 myEnv) (eval e2 myEnv);;
+	| Difference(e1,e2) -> set_differenceSet (eval e1 myEnv) (eval e2 myEnv)
+	| Fun(argIde,funExp) -> Closure(argIde,funExp,myEnv)
+	| Apply(e1,e2) ->	(* evT_funApplication applica il parametro attuale actualValue alla 
+						   funzione functionClosure *)
+						let evT_funApplication (functionClosure: evT) (actualValue: evT): evT = 
+						(
+							match functionClosure with (* chiusura non ricorsiva *)
+							| Closure(argIde,fBody,fEnv) -> 
+								(* il parametro attuale è già stato valutato nell'ambiente locale del chiamante *)
+								let functionEnv = (bind fEnv argIde actualValue) in eval fBody functionEnv  
+								(* aggiungo il par. attuale all'ambiente locale del chiamato :
+								   espandiamo l'ambiente della funzione con il binding del parametro 
+								   attuale ed eseguiamo il corpo della funzione*)
+							| _ -> failwith("Function not found")
+						)
+						in evT_funApplication (eval e1 myEnv) (eval e2 myEnv)
+	| Map(funIde,e1) -> (* evT_funApplication funziona come sopra *)
+						let evT_funApplication (functionClosure: evT) (actualValue: evT): evT = 
+						(
+							match functionClosure with (* chiusura non ricorsiva *)
+							| Closure(argIde,fBody,fEnv) -> 
+								let functionEnv = (bind fEnv argIde actualValue) in eval fBody functionEnv  
+							| _ -> failwith("Function not found")
+						) in 
+							(* set_mapFunction controlla che funClosure e set siano rispettivamente
+							   una chiusura di funzione ed un set, quindi procede con l'applicare
+							   la funzione ad ogni elemento del set *)
+							let set_mapFunction (funClosure: evT) (set: evT): evT =
+							(
+								match funClosure with
+								| Closure(argIde, fBody, fEnv) -> 
+									(
+										match set with
+										| Set(type1,valuesList) -> 
+											(* applico il predicato a tutti gli elementi nel set *)
+											let rec aux lista = 
+												(
+													match lista with
+													| [] -> emptyEvtList
+													| h::t -> (evT_funApplication funClosure h)::(aux t)
+												) in Set(type1,aux valuesList)
+										| _ -> failwith("Second argument is not a set")
+									)
+								| Unbound -> failwith("Function not found")
+								| _ -> failwith("Run-time error") 
+							)
+							in set_mapFunction (lookup myEnv funIde) (eval e1 myEnv);;

@@ -179,3 +179,18 @@ let emptySetsDifference3 = Difference(EmptySet(IntType),EmptySet(IntType));;
 eval emptySetsDifference3 emptyEnv;;
 let emptySetDifference = Difference(firstSet,firstSet);;
 eval emptySetDifference emptyEnv;;
+
+(* METODO Map *)
+let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
+let incrementFunction = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", integerSet));;
+eval incrementFunction emptyEnv;;
+
+let equal2Function = Let("stupidFun", Fun("x", Equal(Den("x"), CstInt(2))), Map("stupidFun", integerSet));;
+eval equal2Function emptyEnv;;
+
+let incrementEmptySet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", EmptySet(BoolType)));;
+eval incrementEmptySet emptyEnv;;
+
+let incrementErrorSet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", Singleton(CstBool(true), BoolType)));;
+eval incrementErrorSet emptyEnv;;
+
