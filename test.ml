@@ -182,15 +182,46 @@ eval emptySetDifference emptyEnv;;
 
 (* METODO Map *)
 let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
-let incrementFunction = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", integerSet));;
+let incrementFunction = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), integerSet));;
 eval incrementFunction emptyEnv;;
 
-let equal2Function = Let("stupidFun", Fun("x", Equal(Den("x"), CstInt(2))), Map("stupidFun", integerSet));;
+let equal2Function = Let("stupidFun", Fun("x", Equal(Den("x"), CstInt(2))), Map(Den("stupidFun"), integerSet));;
 eval equal2Function emptyEnv;;
 
-let incrementEmptySet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", EmptySet(BoolType)));;
+let incrementEmptySet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), EmptySet(BoolType)));;
 eval incrementEmptySet emptyEnv;;
 
-let incrementErrorSet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map("incFun", Singleton(CstBool(true), BoolType)));;
+let incrementErrorSet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), Singleton(CstBool(true), BoolType)));;
 eval incrementErrorSet emptyEnv;;
+
+(* METODO ForAll *)
+let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
+let notEqual3 = Let("notEqual3", Fun("x",Not(Equal(Den("x"), CstInt(3)))), ForAll(Den("notEqual3"), integerSet));;
+eval notEqual3 emptyEnv;;
+
+let notEqual4 = Let("notEqual4", Fun("x",Not(Equal(Den("x"), CstInt(4)))), ForAll(Den("notEqual4"), integerSet));;
+eval notEqual4 emptyEnv;;
+
+(* METODO Exists *)
+let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
+let notEqual3 = Let("notEqual3", Fun("x",Not(Equal(Den("x"), CstInt(3)))), Exists(Den("notEqual3"), integerSet));;
+eval notEqual3 emptyEnv;;
+
+let equal4 = Let("equal4", Fun("x",Equal(Den("x"), CstInt(4))), Exists(Den("equal4"), integerSet));;
+eval equal4 emptyEnv;;
+
+let error = Exists(Den("equal4"), integerSet);;
+eval error emptyEnv;;
+
+(* METODO Filter *)
+let firstSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
+let notEqual3 = Let("notEqual3", Fun("x",Not(Equal(Den("x"), CstInt(3)))), Filter(Den("notEqual3"), firstSet));;
+eval notEqual3 emptyEnv;;
+
+let secondSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(5)),CstInt(4)), CstInt(3));;
+let isInFirstSet = Let("isInSet1", Fun("x",IsIn(firstSet, Den("x"))), Filter(Den("isInSet1"), secondSet));;
+eval isInFirstSet emptyEnv;;
+
+let notBooleanFunction = Let("errorFun", Fun("x",Sum(CstInt(1),Den("x"))), Filter(Den("errorFun"), secondSet));;
+eval notBooleanFunction emptyEnv;;
 
