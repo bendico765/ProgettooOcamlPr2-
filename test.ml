@@ -185,14 +185,27 @@ let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), C
 let incrementFunction = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), integerSet));;
 eval incrementFunction emptyEnv;;
 
-let equal2Function = Let("stupidFun", Fun("x", Equal(Den("x"), CstInt(2))), Map(Den("stupidFun"), integerSet));;
-eval equal2Function emptyEnv;;
+let equal2FunctionError = Let("stupidFun", Fun("x", Equal(Den("x"), CstInt(2))), Map(Den("stupidFun"), integerSet));;
+eval equal2FunctionError emptyEnv;;
 
 let incrementEmptySet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), EmptySet(BoolType)));;
 eval incrementEmptySet emptyEnv;;
 
 let incrementErrorSet = Let("incFun", Fun("x", Sum(Den("x"), CstInt(1))), Map(Den("incFun"), Singleton(CstBool(true), BoolType)));;
 eval incrementErrorSet emptyEnv;;
+
+let returnTrueFun = Let("returnBoolFun", Fun("x", CstBool(true)), Map(Den("returnBoolFun"), integerSet));;
+eval returnTrueFun emptyEnv;;
+
+(* Uso di map con una funzione ricorsiva *)
+let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(4)),CstInt(5)), CstInt(6));;
+let recursiveFactN =
+	Letrec("fact", "n",
+		Ifthenelse(Equal(Den("n"),CstInt(0)),
+			CstInt(1),
+		Times(Den("n"),Apply(Den("fact"),Sub(Den("n"),CstInt(1))))),
+	Map(Den("fact"),integerSet));;
+eval recursiveFactN emptyEnv;;
 
 (* METODO ForAll *)
 let integerSet = Insert(Insert(Insert(EmptySet(IntType),CstInt(3)),CstInt(2)), CstInt(1));;
